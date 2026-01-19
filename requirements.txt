@@ -1,0 +1,9 @@
+# 项目依赖包列表
+fastapi==0.104.1
+uvicorn==0.24.0
+sqlalchemy==2.0.23
+psycopg2-binary==2.9.9
+python-dotenv==1.0.0
+pydantic==2.5.0
+openai==1.30.1   # 修改：固定版本
+httpx==0.27.0    # 新增：固定版本

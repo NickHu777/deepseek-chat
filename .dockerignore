@@ -1,0 +1,53 @@
+# .dockerignore
+# 忽略的文件和目录
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+ENV/
+env.bak/
+venv.bak/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# 测试
+tests/
+test*.py
+pytest.ini
+
+# 日志和临时文件
+*.log
+*.tmp
+*.temp
+
+# 配置
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# 文档
+docs/
+README.md
+
+# Git
+.git/
+.gitignore
+
+# Docker
+docker-compose.override.yml
+
+# 其他
+.DS_Store
+Thumbs.db

@@ -1,0 +1,72 @@
+services:
+  deepseek-dev-postgres:
+    image: postgres:15-alpine
+    container_name: deepseek-dev-postgres
+    restart: unless-stopped
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_DB: chat_dev
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes: 
+      - postgres_dev_data:/var/lib/postgresql/data
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - deepseek-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  deepseek-postgres:
+    image: postgres:15-alpine
+    container_name: deepseek-postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment: 
+      POSTGRES_DB: chat_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - postgres_prod_data:/var/lib/postgresql/data
+    networks:
+      - deepseek-network
+    healthcheck: 
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  deepseek-fastapi: 
+    build: .
+    container_name: deepseek-fastapi
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      ENV: production
+      DEBUG: "true"
+      DB_HOST: deepseek-postgres
+      DB_PORT: 5432
+      DB_NAME:  chat_db
+      DB_USER: postgres
+      DB_PASSWORD:  postgres
+      DEEPSEEK_API_KEY: sk-1567a59b7c7e4e4482ec7126483624a7
+    depends_on: 
+      deepseek-postgres: 
+        condition: service_healthy
+    networks:
+      - deepseek-network
+
+volumes:
+  postgres_dev_data:
+    driver: local
+  postgres_prod_data:
+    driver: local
+
+networks:
+  deepseek-network:
+    driver: bridge
