@@ -1,6 +1,6 @@
 services:
   deepseek-dev-postgres:
-    image: ankane/pgvector:pg15
+    image: pgvector/pgvector:pg15
     container_name: deepseek-dev-postgres
     restart: unless-stopped
     ports:
@@ -21,7 +21,7 @@ services:
       retries: 5
 
   deepseek-postgres:
-    image: ankane/pgvector:pg15
+    image: pgvector/pgvector:pg15
     container_name: deepseek-postgres
     restart: unless-stopped
     ports:
@@ -40,40 +40,40 @@ services:
       timeout: 5s
       retries: 5
 
-deepseek-fastapi:
-  build: .
-  container_name: deepseek-fastapi
-  restart: unless-stopped
-  ports:
-    - "8000:8000"
-  environment:
-    ENV: ${ENV:-development}
-    DEBUG: ${DEBUG:-true}
-    DB_HOST: ${DB_HOST:-deepseek-postgres}
-    DB_PORT: ${DB_PORT:-5432}
-    DB_NAME: ${DB_NAME:-chat_db}
-    DB_USER: ${DB_USER:-postgres}
-    DB_PASSWORD: ${DB_PASSWORD:-postgres}
-    DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY}
+  deepseek-fastapi:
+    build: .
+    container_name: deepseek-fastapi
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      ENV: production
+      DEBUG: false
+      DB_HOST: deepseek-postgres
+      DB_PORT: 5432
+      DB_NAME: chat_db
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY}
 
-    # 新增向量配置
-    VECTOR_MODEL: ${VECTOR_MODEL:-all-MiniLM-L6-v2}
-    EMBEDDING_DIMENSION: ${EMBEDDING_DIMENSION:-384}
-    UPLOAD_DIR: ${UPLOAD_DIR:-/app/uploads}
-    MAX_FILE_SIZE: ${MAX_FILE_SIZE:-10485760}
-    ALLOWED_EXTENSIONS: ${ALLOWED_EXTENSIONS:-.pdf,.docx,.doc,.txt,.md,.csv,.xlsx,.xls,.json}
-    CHUNK_SIZE: ${CHUNK_SIZE:-1000}
-    CHUNK_OVERLAP: ${CHUNK_OVERLAP:-200}
-    SIMILARITY_THRESHOLD: ${SIMILARITY_THRESHOLD:-0.7}
-    SEARCH_LIMIT: ${SEARCH_LIMIT:-5}
-    ENABLE_ASYNC_PROCESSING: ${ENABLE_ASYNC_PROCESSING:-true}
-  volumes:
-    - ./uploads:/app/uploads  # 添加上传目录映射
-  depends_on:
-    deepseek-postgres:
-      condition: service_healthy
-  networks:
-    - deepseek-network
+      # 新增向量配置
+      VECTOR_MODEL: all-MiniLM-L6-v2
+      EMBEDDING_DIMENSION: 384
+      UPLOAD_DIR: /app/uploads
+      MAX_FILE_SIZE: 10485760
+      ALLOWED_EXTENSIONS: .pdf,.docx,.doc,.txt,.md,.csv,.xlsx,.xls,.json
+      CHUNK_SIZE: 1000
+      CHUNK_OVERLAP: 200
+      SIMILARITY_THRESHOLD: 0.7
+      SEARCH_LIMIT: 5
+      ENABLE_ASYNC_PROCESSING: true
+    volumes:
+      - ./uploads:/app/uploads  # 添加上传目录映射
+    depends_on:
+      deepseek-postgres:
+        condition: service_healthy
+    networks:
+      - deepseek-network
 
 volumes:
   postgres_dev_data:

@@ -1,11 +1,13 @@
 """
 AI聊天API路由 - 修改版（按前端规范）
-实现：POST /chat, POST /chat/generate
+实现：POST /chat, POST /chat/generate, 流式接口
 完全按前端要求：无前缀，正确格式返回
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
+import json
 
 from app.api.dependencies import (
     get_db_session,
@@ -208,3 +210,121 @@ def create_chat_history_with_welcome(self, title: str) -> ChatHistoryResponse:
     except Exception as e:
         self.db.rollback()
         raise DatabaseException(f"创建聊天历史失败: {str(e)}")
+
+
+# ============== 流式对话接口 ==============
+
+@router.post(
+    "/chat-histories/{chat_history_id}/messages/stream",
+    summary="发送消息并获取AI流式回复（带上下文）",
+    description="在指定的聊天历史中发送消息并以流式方式获取AI回复"
+)
+async def send_chat_message_stream(
+        chat_history_id: int,
+        message: str,
+        message_service: ChatMessageService = Depends(get_chat_message_service),
+        ai_service: AIService = Depends(get_ai_service),
+        db: Session = Depends(get_db_session)
+):
+    """
+    流式对话接口（带上下文） - AI 逐字输出
+
+    与 /chat-histories/{id}/messages 功能相同，但使用流式输出
+    
+    返回格式（SSE）：
+    data: {"type": "token", "content": "你"}
+    data: {"type": "token", "content": "好"}
+    data: {"type": "done", "message_id": 123}
+    """
+    async def event_generator():
+        try:
+            from app.services import ChatHistoryService
+            from app.schemas import ChatRequest
+
+            # 1. 保存用户消息
+            chat_request = ChatRequest(message=message, chatId=chat_history_id)
+            request_result = message_service.process_chat_request(chat_request)
+            user_message = request_result["user_message"]
+
+            # 2. 获取对话上下文
+            context = message_service.get_conversation_context(chat_request.chatId)
+
+            # 3. 流式生成 AI 回复
+            full_reply = ""
+            for token in ai_service.generate_reply_stream(
+                prompt=user_message["content"],
+                context=context
+            ):
+                full_reply += token
+                yield f"data: {json.dumps({'type': 'token', 'content': token}, ensure_ascii=False)}\n\n"
+
+            # 4. 保存完整的 AI 回复
+            ai_message = message_service.create_ai_message(
+                chat_history_id=chat_request.chatId,
+                content=full_reply
+            )
+
+            # 5. 更新标题
+            if len(context) == 0:
+                history_service = ChatHistoryService(db)
+                history_service.update_chat_history_title_from_messages(chat_request.chatId)
+
+            # 发送完成事件
+            yield f"data: {json.dumps({'type': 'done', 'message_id': ai_message.id}, ensure_ascii=False)}\n\n"
+
+        except Exception as e:
+            yield f"data: {json.dumps({'type': 'error', 'message': str(e)}, ensure_ascii=False)}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no"
+        }
+    )
+
+
+@router.post(
+    "/completions/stream",
+    summary="获取AI流式回复（独立接口）",
+    description="根据用户输入生成AI流式回复，无上下文"
+)
+async def generate_ai_reply_stream(
+        prompt: str,
+        ai_service: AIService = Depends(get_ai_service)
+):
+    """
+    流式独立对话接口（无上下文） - AI 逐字输出
+
+    与 /completions 功能相同，但使用流式输出
+    不保存到数据库，不关联聊天历史
+    
+    返回格式（SSE）：
+    data: {"type": "token", "content": "你"}
+    data: {"type": "token", "content": "好"}
+    data: {"type": "done"}
+    """
+    async def event_generator():
+        try:
+            # 流式生成 AI 回复（无上下文）
+            for token in ai_service.generate_reply_stream(
+                prompt=prompt,
+                context=None
+            ):
+                yield f"data: {json.dumps({'type': 'token', 'content': token}, ensure_ascii=False)}\n\n"
+
+            # 发送完成事件
+            yield f"data: {json.dumps({'type': 'done'}, ensure_ascii=False)}\n\n"
+
+        except Exception as e:
+            yield f"data: {json.dumps({'type': 'error', 'message': str(e)}, ensure_ascii=False)}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no"
+        }
+    )

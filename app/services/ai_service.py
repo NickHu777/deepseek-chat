@@ -190,6 +190,86 @@ class AIService:
                 print(f"❌ AI调用失败: {str(e)}")
                 raise AIException(f"生成AI回复失败: {str(e)}")
 
+    def generate_reply_stream(
+            self,
+            prompt: str,
+            context: Optional[List[Dict[str, Any]]] = None,
+            **kwargs
+    ):
+        """
+        生成AI回复（流式输出）- 逐字返回
+
+        Args:
+            prompt: 用户输入
+            context: 对话上下文
+            **kwargs: 额外参数
+
+        Yields:
+            AI回复的每个片段
+        """
+        try:
+            # 验证输入
+            if not prompt or not prompt.strip():
+                raise ValidationException("输入内容不能为空")
+
+            # 构建消息列表
+            messages = []
+            
+            system_prompt = kwargs.get(
+                'system_prompt',
+                "你是一个友好、专业的AI助手。请用简洁、清晰的中文回答问题。"
+            )
+            messages.append({"role": "system", "content": system_prompt})
+
+            # 添加对话上下文
+            max_context = kwargs.get('max_context', 10)
+            if context:
+                recent_context = context[-max_context:] if len(context) > max_context else context
+                for msg in recent_context:
+                    role = msg.get("role", "user")
+                    content = msg.get("content", "")
+                    if content and content.strip():
+                        messages.append({"role": role, "content": content})
+
+            # 添加当前用户消息
+            messages.append({"role": "user", "content": prompt})
+
+            print(f"🤖 调用 DeepSeek API (流式)")
+            print(f"   - 消息数量: {len(messages)}")
+
+            # API 调用参数（stream=True）
+            api_params = {
+                "model": self.model,
+                "messages": messages,
+                "max_tokens": kwargs.get('max_tokens', self.max_tokens),
+                "temperature": kwargs.get('temperature', self.temperature),
+                "top_p": kwargs.get('top_p', self.top_p),
+                "stream": True
+            }
+
+            # 调用 DeepSeek API（流式）
+            stream = self.client.chat.completions.create(**api_params)
+
+            # 逐块返回内容
+            for chunk in stream:
+                if chunk.choices[0].delta.content:
+                    yield chunk.choices[0].delta.content
+
+            print(f"✅ 流式回复完成")
+
+        except ValidationException:
+            raise
+        except Exception as e:
+            error_msg = str(e).lower()
+            if "api_key" in error_msg or "unauthorized" in error_msg:
+                raise AIException("API密钥无效或未授权")
+            elif "rate_limit" in error_msg or "429" in error_msg:
+                raise AIException("API调用频率超限，请稍后再试")
+            elif "timeout" in error_msg:
+                raise AIException("API调用超时，请重试")
+            else:
+                raise AIException(f"流式生成失败: {str(e)}")
+
     def generate_reply_with_context(
             self,
             prompt: str,
