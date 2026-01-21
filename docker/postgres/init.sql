@@ -3,6 +3,7 @@
 
 -- 创建扩展（如果需要）
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS vector;
 
 -- 设置搜索路径（可选）
 SET search_path TO public;

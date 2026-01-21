@@ -20,6 +20,7 @@ from app.models.chat_message import SenderType
 # 导入模型
 from app.models.chat_history import ChatHistory
 from app.models.chat_message import ChatMessage
+from app.models.document import Document, DocumentChunk
 
 # 方便导入的列表 - 添加 Base
 __all__ = [
@@ -28,4 +29,6 @@ __all__ = [
     "SenderType",     # 发送者类型枚举
     "ChatHistory",    # 聊天历史模型
     "ChatMessage",    # 聊天消息模型
+    "Document",
+    "DocumentChunk",
 ]

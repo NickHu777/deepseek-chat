@@ -64,7 +64,7 @@ class ChatRequest(BaseSchema):
 class ChatGenerateRequest(BaseSchema):
     """生成AI回复请求模式"""
     prompt: str = Field(
-        .. .,
+        ...,
         min_length=1,
         max_length=10000,
         description="用户输入内容",

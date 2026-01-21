@@ -2,6 +2,14 @@
 FastAPI 主应用入口 - 修改版（按前端要求）
 """
 
+import sys
+from pathlib import Path
+
+# 确保项目根目录在 Python 路径中（修复 VS Code 右键运行问题）
+project_root = Path(__file__).parent.parent
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -50,7 +58,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="DeepSeek聊天API",
     description="基于FastAPI的智能聊天后端服务 - 按前端规范实现",
-    version="1.0.0",
+    version="1.1.0",
     docs_url="/docs" if settings.DEBUG else None,  # 生产环境隐藏文档
     redoc_url="/redoc" if settings.DEBUG else None,
     openapi_url="/openapi.json" if settings.DEBUG else None,
@@ -127,16 +135,37 @@ async def root():
     """根端点，显示API信息"""
     return {
         "message": "DeepSeek聊天API服务运行中",
-        "version": "1.0.0",
+        "version": "2.0.0",
         "docs": "/docs" if settings.DEBUG else None,
         "environment": settings.ENV,
         "debug": settings.DEBUG,
         "api_endpoints": {
-            "GET /chathistories": "获取所有聊天历史",
-            "POST /chathistories": "创建新聊天历史",
-            "PUT /chathistories/{id}": "更新聊天历史",
-            "POST /chat": "发送消息并获取AI回复",
-            "POST /chat/generate": "独立生成AI回复"
+            "chat_histories": {
+                "GET /chat-histories": "获取所有聊天历史",
+                "POST /chat-histories": "创建新聊天历史",
+                "GET /chat-histories/{id}": "获取单个聊天历史",
+                "PUT /chat-histories/{id}": "更新聊天历史",
+                "DELETE /chat-histories/{id}": "删除聊天历史"
+            },
+            "messages": {
+                "POST /chat-histories/{id}/messages": "发送消息并获取AI回复"
+            },
+            "ai": {
+                "POST /completions": "独立生成AI回复（无上下文）"
+            },
+            "documents": {
+                "POST /documents": "上传文档",
+                "GET /documents": "获取文档列表",
+                "GET /documents/{id}": "获取文档详情",
+                "DELETE /documents/{id}": "删除文档"
+            },
+            "search": {
+                "GET /search/documents": "搜索文档"
+            },
+            "system": {
+                "GET /health": "健康检查",
+                "GET /system/status": "系统状态"
+            }
         }
     }
 

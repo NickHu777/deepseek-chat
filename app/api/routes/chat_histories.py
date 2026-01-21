@@ -27,7 +27,7 @@ router = APIRouter(tags=["聊天历史管理"])
 
 
 @router.get(
-    "/chathistories",
+    "/chat-histories",
     response_model=List[ChatHistoryResponse],
     summary="获取所有聊天历史",
     description="获取聊天历史列表，包含所有消息"
@@ -79,10 +79,10 @@ async def get_all_chat_histories(
 
 
 @router.post(
-    "/chathistories",
+    "/chat-histories",
     response_model=ChatHistoryResponse,
     status_code=status.HTTP_201_CREATED,
-    summary="创建新的聊天历史",
+    summary="创建新聊天",
     description="创建一个新的聊天历史记录"
 )
 async def create_chat_history(
@@ -128,7 +128,7 @@ async def create_chat_history(
 
 
 @router.get(
-    "/chathistories/{chat_history_id}",
+    "/chat-histories/{chat_history_id}",
     response_model=ChatHistoryResponse,
     summary="获取单个聊天历史",
     description="获取指定ID的聊天历史详情，包含所有消息"
@@ -172,9 +172,9 @@ async def get_chat_history(
 
 
 @router.put(
-    "/chathistories/{chat_history_id}",
+    "/chat-histories/{chat_history_id}",
     response_model=ChatHistoryResponse,
-    summary="更新聊天历史",
+    summary="对话重命名",
     description="更新指定ID的聊天历史信息"
 )
 async def update_chat_history(
@@ -217,7 +217,7 @@ async def update_chat_history(
 
 
 @router.delete(
-    "/chathistories/{chat_history_id}",
+    "/chat-histories/{chat_history_id}",
     summary="删除聊天历史",
     description="删除指定ID的聊天历史及其所有消息"
 )

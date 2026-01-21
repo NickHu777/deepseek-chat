@@ -1,5 +1,10 @@
 # .dockerignore
-# 忽略的文件和目录
+# 避免将不必要的文件复制到Docker镜像中
+
+# Git
+.git/
+.gitignore
+.gitattributes
 
 # Python
 __pycache__/
@@ -7,6 +12,11 @@ __pycache__/
 *$py.class
 *.so
 .Python
+*.egg-info/
+dist/
+build/
+
+# Virtual Environment（不需要复制到镜像）
 env/
 venv/
 .venv/
@@ -19,35 +29,56 @@ venv.bak/
 .idea/
 *.swp
 *.swo
+*.sublime-project
+*.sublime-workspace
 
-# 测试
+# 测试文件
 tests/
-test*.py
+test.py
+test_*.py
+*_test.py
 pytest.ini
+.pytest_cache/
+.coverage
+htmlcov/
 
 # 日志和临时文件
 *.log
 *.tmp
 *.temp
+*.bak
+logs/
 
-# 配置
+# 环境变量文件（应在运行时挂载）
 .env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+.env.*
 
-# 文档
-docs/
+# 文档和说明（生产环境不需要）
 README.md
+README*.md
+docs/
+*.md
 
-# Git
-.git/
-.gitignore
+# Docker相关（避免递归）
+Dockerfile
+docker-compose.yml
+docker-compose.*.yml
+.dockerignore
 
-# Docker
-docker-compose.override.yml
+# 上传文件目录（运行时挂载）
+uploads/
 
-# 其他
+# 数据库文件（生产环境使用外部数据库）
+*.db
+*.sqlite
+*.sqlite3
+
+# 操作系统
 .DS_Store
 Thumbs.db
+desktop.ini
+
+# 其他临时文件
+*.pid
+*.seed
+all_readable_files.txt

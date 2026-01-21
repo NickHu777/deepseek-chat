@@ -24,23 +24,24 @@ router = APIRouter(tags=["AI聊天"])
 
 
 @router.post(
-    "/chat",
+    "/chat-histories/{chat_history_id}/messages",
     summary="发送消息并获取AI回复",
-    description="发送用户消息到后端AI服务，并接收AI回复"
+    description="在指定的聊天历史中发送消息并获取AI回复"
 )
 async def send_chat_message(
-        chat_request: ChatRequest,
+        chat_history_id: int,
+        message: str,  # 直接接收消息字符串
         message_service: ChatMessageService = Depends(get_chat_message_service),
         ai_service: AIService = Depends(get_ai_service),
         db: Session = Depends(get_db_session)
 ):
     """
-    发送消息并获取AI回复 - 按前端规范
+    在聊天历史中发送消息并获取AI回复
 
-    - **message**: 用户发送的消息内容
-    - **chatId**: 对话的ID（注意：前端是chatId，我们是chat_id）
+    - **chat_history_id**: 聊天历史ID（路径参数）
+    - **message**: 用户消息内容
 
-    响应格式完全按前端示例：
+    响应格式：
     {
       "success": true,
       "user_message": {...},
@@ -49,6 +50,10 @@ async def send_chat_message(
     """
     try:
         from app.services import ChatHistoryService
+        from app.schemas import ChatRequest
+
+        # 构建 ChatRequest 对象
+        chat_request = ChatRequest(message=message, chatId=chat_history_id)
 
         # 1. 处理用户消息（保存到数据库）
         request_result = message_service.process_chat_request(chat_request)
@@ -113,26 +118,31 @@ async def send_chat_message(
 
 
 @router.post(
-    "/chat/generate",
+    "/completions",
     summary="获取AI回复（独立接口）",
-    description="根据用户输入生成AI回复"
+    description="根据用户输入生成AI回复，无上下文"
 )
 async def generate_ai_reply(
-        generate_request: ChatGenerateRequest,
+        prompt: str,  # 直接接收 prompt 字符串
         ai_service: AIService = Depends(get_ai_service)
 ):
     """
-    生成AI回复（独立接口） - 按前端规范
+    生成AI回复（独立接口）
 
     - **prompt**: 用户的输入内容
 
-    响应格式完全按前端示例：
+    响应格式：
     {
       "success": true,
       "reply": "AI生成的回复内容"
     }
     """
     try:
+        from app.schemas import ChatGenerateRequest
+        
+        # 构建 ChatGenerateRequest 对象
+        generate_request = ChatGenerateRequest(prompt=prompt)
+        
         result = ai_service.process_chat_generate_request(generate_request)
 
         # 按前端格式返回
