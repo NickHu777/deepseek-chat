@@ -9,6 +9,8 @@ services:
       POSTGRES_DB: chat_dev
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
+      TZ: Asia/Shanghai
+      PGTZ: Asia/Shanghai
     volumes: 
       - postgres_dev_data:/var/lib/postgresql/data
       - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
@@ -30,6 +32,8 @@ services:
       POSTGRES_DB: chat_db
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
+      TZ: Asia/Shanghai
+      PGTZ: Asia/Shanghai
     volumes:
       - postgres_prod_data:/var/lib/postgresql/data
     networks:
@@ -55,6 +59,7 @@ services:
       DB_USER: postgres
       DB_PASSWORD: postgres
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY}
+      TZ: Asia/Shanghai
 
       # 新增向量配置
       VECTOR_MODEL: all-MiniLM-L6-v2
@@ -68,7 +73,9 @@ services:
       SEARCH_LIMIT: 5
       ENABLE_ASYNC_PROCESSING: true
     volumes:
-      - ./uploads:/app/uploads  # 添加上传目录映射
+      - ./uploads:/app/uploads
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
     depends_on:
       deepseek-postgres:
         condition: service_healthy

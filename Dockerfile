@@ -29,6 +29,10 @@ COPY --from=builder /root/.local /root/.local
 # 确保 Python 可以找到用户安装的包
 ENV PATH=/root/.local/bin:$PATH
 ENV PYTHONPATH=/app
+ENV TZ=Asia/Shanghai
+
+# 设置时区
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
 # 复制应用代码
 COPY ./app ./app
