@@ -51,35 +51,48 @@ async def send_chat_message(
     }
     """
     try:
+        import asyncio
         from app.services import ChatHistoryService
         from app.schemas import ChatRequest
 
         # 构建 ChatRequest 对象
         chat_request = ChatRequest(message=message, chatId=chat_history_id)
 
-        # 1. 处理用户消息（保存到数据库）- 返回的是 ChatMessageResponse 对象
-        user_message = message_service.create_user_message(
+        # 1. 处理用户消息（保存到数据库）- 在线程池中执行避免阻塞
+        user_message = await asyncio.to_thread(
+            message_service.create_user_message,
             chat_history_id=chat_request.chatId,
             content=chat_request.message
         )
 
-        # 2. 获取对话上下文（用于AI生成）
-        context = message_service.get_conversation_context(chat_request.chatId)
+        # 2. 获取对话上下文
+        context = await asyncio.to_thread(
+            message_service.get_conversation_context,
+            chat_request.chatId
+        )
 
-        # 3. 生成AI回复
-        ai_result = ai_service.process_chat_with_context(user_message.model_dump(), context)
+        # 3. 生成AI回复 - AI调用可能耗时，使用线程池
+        ai_result = await asyncio.to_thread(
+            ai_service.process_chat_with_context,
+            user_message.model_dump(),
+            context
+        )
         ai_reply_content = ai_result["reply"]
 
-        # 4. 保存AI回复到数据库 - 返回的是 ChatMessageResponse 对象
-        ai_message = message_service.create_ai_message(
+        # 4. 保存AI回复到数据库
+        ai_message = await asyncio.to_thread(
+            message_service.create_ai_message,
             chat_history_id=chat_request.chatId,
             content=ai_reply_content
         )
 
         # 5. 更新聊天历史标题（如果是第一条消息）
-        if len(context) == 0:  # 只有用户消息，没有之前的对话
+        if len(context) == 0:
             history_service = ChatHistoryService(db)
-            history_service.update_chat_history_title_from_messages(chat_request.chatId)
+            await asyncio.to_thread(
+                history_service.update_chat_history_title_from_messages,
+                chat_request.chatId
+            )
 
         # 6. 按前端格式返回 - 直接使用 ChatMessageResponse 对象的字段
         return {
@@ -139,12 +152,17 @@ async def generate_ai_reply(
     }
     """
     try:
+        import asyncio
         from app.schemas import ChatGenerateRequest
         
         # 构建 ChatGenerateRequest 对象
         generate_request = ChatGenerateRequest(prompt=prompt)
         
-        result = ai_service.process_chat_generate_request(generate_request)
+        # AI调用可能耗时，使用线程池避免阻塞
+        result = await asyncio.to_thread(
+            ai_service.process_chat_generate_request,
+            generate_request
+        )
 
         # 按前端格式返回
         return {
@@ -236,45 +254,74 @@ async def send_chat_message_stream(
     data: {"type": "done", "message_id": 123}
     """
     async def event_generator():
+        import asyncio
         try:
             from app.services import ChatHistoryService
             from app.schemas import ChatRequest
 
             # 🔥 立即发送开始事件，让前端知道请求已收到
             yield f"data: {json.dumps({'type': 'start', 'message': 'AI正在思考...'}, ensure_ascii=False)}\n\n"
+            await asyncio.sleep(0)  # 确保立即发送
 
-            # 1. 保存用户消息
+            # 1. 保存用户消息 - 使用线程池避免阻塞
             chat_request = ChatRequest(message=message, chatId=chat_history_id)
-            user_message = message_service.create_user_message(
+            user_message = await asyncio.to_thread(
+                message_service.create_user_message,
                 chat_history_id=chat_request.chatId,
                 content=chat_request.message
             )
 
             # 发送用户消息已保存的确认
             yield f"data: {json.dumps({'type': 'user_message', 'message_id': user_message.id}, ensure_ascii=False)}\n\n"
+            await asyncio.sleep(0)  # 确保立即发送
 
-            # 2. 获取对话上下文
-            context = message_service.get_conversation_context(chat_request.chatId)
+            # 2. 获取对话上下文 - 使用线程池
+            context = await asyncio.to_thread(
+                message_service.get_conversation_context,
+                chat_request.chatId
+            )
 
-            # 3. 流式生成 AI 回复
+            # 3. 流式生成 AI 回复 - 在线程中运行同步生成器
             full_reply = ""
-            for token in ai_service.generate_reply_stream(
+            
+            # 🔥 使用 run_in_executor 在线程池中运行同步生成器
+            import concurrent.futures
+            loop = asyncio.get_event_loop()
+            
+            # 创建同步生成器
+            stream_gen = ai_service.generate_reply_stream(
                 prompt=user_message.content,
                 context=context
-            ):
-                full_reply += token
-                yield f"data: {json.dumps({'type': 'token', 'content': token}, ensure_ascii=False)}\n\n"
+            )
+            
+            # 在线程池中逐个获取 token
+            executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+            while True:
+                try:
+                    # 在线程池中获取下一个token
+                    token = await loop.run_in_executor(executor, lambda: next(stream_gen, None))
+                    if token is None:
+                        break
+                    full_reply += token
+                    yield f"data: {json.dumps({'type': 'token', 'content': token}, ensure_ascii=False)}\n\n"
+                    await asyncio.sleep(0)  # 🔥 关键：确保每个token立即发送
+                except StopIteration:
+                    break
 
-            # 4. 保存完整的 AI 回复
-            ai_message = message_service.create_ai_message(
+            # 4. 保存完整的 AI 回复 - 使用线程池
+            ai_message = await asyncio.to_thread(
+                message_service.create_ai_message,
                 chat_history_id=chat_request.chatId,
                 content=full_reply
             )
 
-            # 5. 更新标题
+            # 5. 更新标题 - 使用线程池
             if len(context) == 0:
                 history_service = ChatHistoryService(db)
-                history_service.update_chat_history_title_from_messages(chat_request.chatId)
+                await asyncio.to_thread(
+                    history_service.update_chat_history_title_from_messages,
+                    chat_request.chatId
+                )
 
             # 发送完成事件
             yield f"data: {json.dumps({'type': 'done', 'message_id': ai_message.id}, ensure_ascii=False)}\n\n"
@@ -286,8 +333,10 @@ async def send_chat_message_stream(
         event_generator(),
         media_type="text/event-stream",
         headers={
-            "Cache-Control": "no-cache",
-            "X-Accel-Buffering": "no"
+            "Cache-Control": "no-cache, no-transform",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+            "Content-Encoding": "none"
         }
     )
 
@@ -313,16 +362,33 @@ async def generate_ai_reply_stream(
     data: {"type": "done"}
     """
     async def event_generator():
+        import asyncio
         try:
             # 🔥 立即发送开始事件
             yield f"data: {json.dumps({'type': 'start', 'message': 'AI正在思考...'}, ensure_ascii=False)}\n\n"
+            await asyncio.sleep(0)  # 确保立即发送
             
-            # 流式生成 AI 回复（无上下文）
-            for token in ai_service.generate_reply_stream(
+            # 流式生成 AI 回复（无上下文） - 在线程中运行同步生成器
+            import concurrent.futures
+            loop = asyncio.get_event_loop()
+            
+            # 创建同步生成器
+            stream_gen = ai_service.generate_reply_stream(
                 prompt=prompt,
                 context=None
-            ):
-                yield f"data: {json.dumps({'type': 'token', 'content': token}, ensure_ascii=False)}\n\n"
+            )
+            
+            # 在线程池中逐个获取 token
+            executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+            while True:
+                try:
+                    token = await loop.run_in_executor(executor, lambda: next(stream_gen, None))
+                    if token is None:
+                        break
+                    yield f"data: {json.dumps({'type': 'token', 'content': token}, ensure_ascii=False)}\n\n"
+                    await asyncio.sleep(0)  # 🔥 关键：确保每个token立即发送
+                except StopIteration:
+                    break
 
             # 发送完成事件
             yield f"data: {json.dumps({'type': 'done'}, ensure_ascii=False)}\n\n"
@@ -334,7 +400,9 @@ async def generate_ai_reply_stream(
         event_generator(),
         media_type="text/event-stream",
         headers={
-            "Cache-Control": "no-cache",
-            "X-Accel-Buffering": "no"
+            "Cache-Control": "no-cache, no-transform",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+            "Content-Encoding": "none"
         }
     )
