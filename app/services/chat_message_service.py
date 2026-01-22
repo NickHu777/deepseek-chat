@@ -164,7 +164,7 @@ class ChatMessageService:
             for field, value in update_dict.items():
                 setattr(db_message, field, value)
 
-            db_message.updated_at = datetime.utcnow()
+            db_message.updated_at = datetime.now()
 
             self.db.commit()
             self.db.refresh(db_message)

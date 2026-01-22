@@ -124,7 +124,7 @@ class ChatHistoryService:
             for field, value in update_dict.items():
                 setattr(db_chat_history, field, value)
 
-            db_chat_history.updated_at = datetime.utcnow()
+            db_chat_history.updated_at = datetime.now()
 
             self.db.commit()
             self.db.refresh(db_chat_history)
@@ -204,7 +204,7 @@ class ChatHistoryService:
             if not db_chat_history:
                 raise NotFoundException("聊天历史", chat_history_id)
 
-            db_chat_history.updated_at = datetime.utcnow()
+            db_chat_history.updated_at = datetime.now()
 
             self.db.commit()
             self.db.refresh(db_chat_history)

@@ -81,18 +81,7 @@ class ChatHistoryResponse(ChatHistoryInDB):
             if not hasattr(db_history, attr):
                 raise TypeError(f"数据库模型缺少必要属性: {attr}")
 
-        # 格式化日期：相对时间（今天/昨天/具体日期）
-        today = datetime.now().date()
-        history_date = db_history.created_at.date()
-
-        if history_date == today:
-            date_str = f"今天 {db_history.created_at.strftime('%H:%M')}"
-        elif history_date == today - timedelta(days=1):
-            date_str = f"昨天 {db_history.created_at.strftime('%H:%M')}"
-        else:
-            date_str = db_history.created_at.strftime("%Y-%m-%d %H:%M")
-
-        # 转换消息
+        # 转换消息（先处理消息，因为我们需要用它来确定显示时间）
         messages = []
         if include_messages and hasattr(db_history, 'messages'):
             # 确保我们有一个可迭代的消息列表
@@ -104,7 +93,7 @@ class ChatHistoryResponse(ChatHistoryInDB):
             # 确保消息按时间排序
             sorted_messages = sorted(
                 messages_iter,
-                key=lambda msg: msg.created_at if hasattr(msg, 'created_at') else 0
+                key=lambda msg: msg.created_at if hasattr(msg, 'created_at') else datetime.min
             )
 
             messages = [
@@ -112,6 +101,22 @@ class ChatHistoryResponse(ChatHistoryInDB):
                 for msg in sorted_messages
                 if hasattr(msg, 'id') and hasattr(msg, 'content')
             ]
+
+        # 格式化日期：优先使用第一条消息的时间，如果没有消息则使用聊天历史创建时间
+        display_time = db_history.created_at
+        if messages and len(messages) > 0:
+            # 使用第一条消息的创建时间
+            display_time = messages[0].created_at
+        
+        today = datetime.now().date()
+        history_date = display_time.date()
+
+        if history_date == today:
+            date_str = f"今天 {display_time.strftime('%H:%M')}"
+        elif history_date == today - timedelta(days=1):
+            date_str = f"昨天 {display_time.strftime('%H:%M')}"
+        else:
+            date_str = display_time.strftime("%Y-%m-%d %H:%M")
 
         return cls(
             id=db_history.id,

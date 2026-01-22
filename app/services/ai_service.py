@@ -35,7 +35,7 @@ class AIService:
                 # 超时配置 - 保证生产环境稳定性
                 timeout=httpx.Timeout(
                     connect=10.0,  # 连接超时 10 秒
-                    read=60.0,  # 读取超时 60 秒
+                    read=300.0,  # 读取超时 300 秒（5分钟）- 支持长文本回复
                     write=10.0,  # 写入超时 10 秒
                     pool=5.0  # 连接池超时 5 秒
             ),
@@ -57,7 +57,7 @@ class AIService:
                 base_url="https://api.deepseek.com",
                 http_client=http_client,  # 使用自定义 HTTP 客户端
                 max_retries=2,  # API 调用失败时重试次数
-                timeout=60.0,  # 总超时时间
+                timeout=300.0,  # 总超时时间（5分钟）- 支持长文本回复
                 default_headers={  # 自定义请求头
                     "User-Agent": "DeepSeek-Chat-Backend/1.0"
                 }
@@ -66,7 +66,7 @@ class AIService:
             print(f"✅ AI服务初始化成功")
             print(f"   - 模型: deepseek-chat")
             print(f"   - 连接池: 100 连接, 20 保活")
-            print(f"   - 超时:  连接 10s, 读取 60s")
+            print(f"   - 超时:  连接 10s, 读取 300s (5分钟)")
             print(f"   - 重试:  最多 2 次")
 
         except Exception as e:

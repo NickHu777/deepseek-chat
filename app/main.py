@@ -59,9 +59,9 @@ app = FastAPI(
     title="DeepSeek聊天API",
     description="基于FastAPI的智能聊天后端服务 - 按前端规范实现",
     version="1.1.0",
-    docs_url="/docs" if settings.DEBUG else None,  # 生产环境隐藏文档
-    redoc_url="/redoc" if settings.DEBUG else None,
-    openapi_url="/openapi.json" if settings.DEBUG else None,
+    docs_url="/docs",  # 始终启用文档
+    redoc_url="/redoc",
+    openapi_url="/openapi.json",
     lifespan=lifespan
 )
 
@@ -207,5 +207,7 @@ if __name__ == "__main__":
         host="0.0.0.0",
         port=9000,  # 开发环境端口
         reload=True,  # 热重载
-        log_level="debug" if settings.DEBUG else "info"
+        log_level="debug" if settings.DEBUG else "info",
+        timeout_keep_alive=300,  # 保持连接超时300秒（5分钟）
+        timeout_graceful_shutdown=30  # 优雅关闭超时30秒
     )

@@ -57,18 +57,20 @@ async def send_chat_message(
         # 构建 ChatRequest 对象
         chat_request = ChatRequest(message=message, chatId=chat_history_id)
 
-        # 1. 处理用户消息（保存到数据库）
-        request_result = message_service.process_chat_request(chat_request)
-        user_message = request_result["user_message"]
+        # 1. 处理用户消息（保存到数据库）- 返回的是 ChatMessageResponse 对象
+        user_message = message_service.create_user_message(
+            chat_history_id=chat_request.chatId,
+            content=chat_request.message
+        )
 
         # 2. 获取对话上下文（用于AI生成）
         context = message_service.get_conversation_context(chat_request.chatId)
 
         # 3. 生成AI回复
-        ai_result = ai_service.process_chat_with_context(user_message, context)
+        ai_result = ai_service.process_chat_with_context(user_message.model_dump(), context)
         ai_reply_content = ai_result["reply"]
 
-        # 4. 保存AI回复到数据库
+        # 4. 保存AI回复到数据库 - 返回的是 ChatMessageResponse 对象
         ai_message = message_service.create_ai_message(
             chat_history_id=chat_request.chatId,
             content=ai_reply_content
@@ -79,23 +81,20 @@ async def send_chat_message(
             history_service = ChatHistoryService(db)
             history_service.update_chat_history_title_from_messages(chat_request.chatId)
 
-        # 6. 按前端格式返回
+        # 6. 按前端格式返回 - 直接使用 ChatMessageResponse 对象的字段
         return {
             "success": True,
             "user_message": {
-                "id": user_message["id"],
-                "content": user_message["content"],
-                "sender": "user",
-                "time": user_message["created_at"].strftime("%Y-%m-%d %H:%M:%S")
-                if hasattr(user_message["created_at"], 'strftime')
-                else user_message["created_at"]
+                "id": user_message.id,
+                "content": user_message.content,
+                "sender": user_message.sender,
+                "time": user_message.time
             },
             "ai_reply": {
                 "id": ai_message.id,
                 "content": ai_message.content,
-                "sender": "ai",
-                "time": ai_message.created_at.strftime("%Y-%m-%d %H:%M:%S")
-                if ai_message.created_at else ""
+                "sender": ai_message.sender,
+                "time": ai_message.time
             }
         }
 
@@ -241,10 +240,18 @@ async def send_chat_message_stream(
             from app.services import ChatHistoryService
             from app.schemas import ChatRequest
 
+            # 🔥 立即发送开始事件，让前端知道请求已收到
+            yield f"data: {json.dumps({'type': 'start', 'message': 'AI正在思考...'}, ensure_ascii=False)}\n\n"
+
             # 1. 保存用户消息
             chat_request = ChatRequest(message=message, chatId=chat_history_id)
-            request_result = message_service.process_chat_request(chat_request)
-            user_message = request_result["user_message"]
+            user_message = message_service.create_user_message(
+                chat_history_id=chat_request.chatId,
+                content=chat_request.message
+            )
+
+            # 发送用户消息已保存的确认
+            yield f"data: {json.dumps({'type': 'user_message', 'message_id': user_message.id}, ensure_ascii=False)}\n\n"
 
             # 2. 获取对话上下文
             context = message_service.get_conversation_context(chat_request.chatId)
@@ -252,7 +259,7 @@ async def send_chat_message_stream(
             # 3. 流式生成 AI 回复
             full_reply = ""
             for token in ai_service.generate_reply_stream(
-                prompt=user_message["content"],
+                prompt=user_message.content,
                 context=context
             ):
                 full_reply += token
@@ -307,6 +314,9 @@ async def generate_ai_reply_stream(
     """
     async def event_generator():
         try:
+            # 🔥 立即发送开始事件
+            yield f"data: {json.dumps({'type': 'start', 'message': 'AI正在思考...'}, ensure_ascii=False)}\n\n"
+            
             # 流式生成 AI 回复（无上下文）
             for token in ai_service.generate_reply_stream(
                 prompt=prompt,

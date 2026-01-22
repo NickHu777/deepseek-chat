@@ -19,7 +19,7 @@ class Document(BaseModel):
     file_path = Column(Text)
     file_type = Column(String(50))
     file_size = Column(BigInteger)
-    upload_time = Column(DateTime, default=datetime.utcnow, nullable=False)
+    upload_time = Column(DateTime, default=datetime.now, nullable=False)
     user_id = Column(String(100))
     file_metadata = Column(JSON, default={}, name="metadata")  # 改名为file_metadata，数据库列名为metadata
 
