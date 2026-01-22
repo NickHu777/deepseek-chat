@@ -108,6 +108,10 @@ class ChatHistoryResponse(ChatHistoryInDB):
             # 使用第一条消息的创建时间
             display_time = messages[0].created_at
         
+        # 确保display_time是datetime对象
+        if not isinstance(display_time, datetime):
+            display_time = db_history.created_at
+        
         today = datetime.now().date()
         history_date = display_time.date()
 
@@ -116,7 +120,7 @@ class ChatHistoryResponse(ChatHistoryInDB):
         elif history_date == today - timedelta(days=1):
             date_str = f"昨天 {display_time.strftime('%H:%M')}"
         else:
-            date_str = display_time.strftime("%Y-%m-%d %H:%M")
+            date_str = display_time.strftime("%Y-%m-%d")
 
         return cls(
             id=db_history.id,
